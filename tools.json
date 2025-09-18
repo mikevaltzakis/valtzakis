@@ -1,0 +1,6 @@
+{
+  "tool1": { "name": "6mm End Mill", "diameter": 6, "feedRate": 800, "plungeRate": 300, "safeZ": 5 },
+  "tool2": { "name": "3mm Ball Nose", "diameter": 3, "feedRate": 600, "plungeRate": 200, "safeZ": 5 },
+  "tool3": { "name": "10mm End Mill", "diameter": 10, "feedRate": 1200, "plungeRate": 400, "safeZ": 5 },
+  "tool4": { "name": "12mm End Mill", "diameter": 12, "feedRate": 700, "plungeRate": 300, "safeZ": 5 }
+}

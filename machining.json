@@ -1,0 +1,9 @@
+{
+  "millingDirection": ["climb", "conventional"],
+  "profileMode": ["inside", "outside"],
+  "shapeMode": ["cut", "engrave", "pocket", "outline"],
+  "finishingPass": true,
+  "stepOverDefault": 40,
+  "rampIn": true,
+  "leadInOut": true
+}

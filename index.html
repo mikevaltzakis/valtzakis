@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Valtzakis CNC Generator</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+    input, select, textarea, button { width: 100%; margin: 10px 0; padding: 8px; }
+    canvas { border: 1px solid #000; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>🛠️ Valtzakis CNC G-code Generator</h1>
+
+  <label for="shape">Shape</label>
+  <select id="shape"></select>
+  <div id="shapeInputs"></div>
+
+  <label for="toolSelect">Tool</label>
+  <select id="toolSelect"></select>
+
+  <label for="passDepths">Pass Depths (e.g. -2,-5,-8)</label>
+  <input type="text" id="passDepths">
+
+  <label for="centerX">Center X (mm)</label>
+  <input type="number" id="centerX">
+
+  <label for="centerY">Center Y (mm)</label>
+  <input type="number" id="centerY">
+
+  <label for="originMode">Origin Mode</label>
+  <select id="originMode">
+    <option value="center">Center</option>
+    <option value="bottom-left">Bottom-Left</option>
+    <option value="top-left">Top-Left</option>
+  </select>
+
+  <h2>⚙️ Machining Options</h2>
+
+  <label for="shapeMode">Shape Mode</label>
+  <select id="shapeMode"></select>
+
+  <label for="profileMode">Profile Cut Mode</label>
+  <select id="profileMode"></select>
+
+  <label for="millingDirection">Milling Direction</label>
+  <select id="millingDirection"></select>
+
+  <label><input type="checkbox" id="finishPass"> Finishing Pass</label>
+
+  <label for="stepOver">Step-over (%)</label>
+  <input type="number" id="stepOver" value="40">
+
+  <label><input type="checkbox" id="rampIn"> Ramp-in</label>
+  <label><input type="checkbox" id="leadInOut"> Lead-in / Lead-out</label>
+  <label><input type="checkbox" id="adaptiveClearing"> Adaptive Clearing</label>
+  <label><input type="checkbox" id="restMachining"> Rest Machining</label>
+
+  <h2>🧩 Post Processor</h2>
+  <textarea id="ppEditor" rows="6">G92 X0 Y0 Z0
+M8
+G4 P1</textarea>
+
+  <button onclick="generateGCode()">⚙️ Generate G-code</button>
+  <button onclick="downloadGCode()">⬇️ Download .nc</button>
+  <textarea id="gcodeOutput" rows="10" placeholder="G-code will appear here..."></textarea>
+
+  <canvas id="preview" width="400" height="400"></canvas>
+
+  <script>
+    // Embedded configuration data
+    const tools = {
+	  "tool1": { name: "6mm End Mill", diameter: 6, feedRate: 800, plungeRate: 300, safeZ: 5 },
+      "tool2": { name: "3mm Ball Nose", diameter: 3, feedRate: 600, plungeRate: 200, safeZ: 5 },
+      "tool3": { name: "9mm End Mill", diameter: 9, feedRate: 800, plungeRate: 300, safeZ: 5 },
+      "tool4": { name: "10mm Ball Nose", diameter: 10, feedRate: 800, plungeRate: 200, safeZ: 5 }
+    };
+
+    const shapes = {
+      "rectangle": { type: "rectangle", width: 100, height: 50 },
+      "circle": { type: "circle", radius: 40 },
+      "keyhole": { type: "keyhole", kh_radius: 20, kh_length: 60, kh_width: 10, rotation: 90 }
+    };
+
+    const machining = {
+      shapeMode: ["cut", "engrave", "pocket", "outline"],
+      profileMode: ["outside", "inside"],
+      millingDirection: ["climb", "conventional"],
+      finishingPass: true,
+      stepOverDefault: 40,
+      rampIn: true,
+      leadInOut: true
+    };
+
+    const paths = {
+      adaptiveClearing: { enabled: true, strategy: "trochoidal" },
+      restMachining: { enabled: true, threshold: 0.3 },
+      animatedPreview: { enabled: true, speed: 1.0 }
+    };
+
+    // Populate dropdowns
+    window.onload = () => {
+      const shapeSelect = document.getElementById("shape");
+      for (const key in shapes) {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = key;
+        shapeSelect.appendChild(opt);
+      }
+      updateShapeUI();
+
+      const toolSelect = document.getElementById("toolSelect");
+      for (const key in tools) {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = tools[key].name;
+        toolSelect.appendChild(opt);
+      }
+
+      fillSelect("shapeMode", machining.shapeMode);
+      fillSelect("profileMode", machining.profileMode);
+      fillSelect("millingDirection", machining.millingDirection);
+      document.getElementById("stepOver").value = machining.stepOverDefault;
+      document.getElementById("finishPass").checked = machining.finishingPass;
+      document.getElementById("rampIn").checked = machining.rampIn;
+      document.getElementById("leadInOut").checked = machining.leadInOut;
+      document.getElementById("adaptiveClearing").checked = paths.adaptiveClearing.enabled;
+      document.getElementById("restMachining").checked = paths.restMachining.enabled;
+    };
+
+    function fillSelect(id, options) {
+      const select = document.getElementById(id);
+      options.forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        select.appendChild(o);
+      });
+    }
+
+    function updateShapeUI() {
+      const shapeKey = document.getElementById("shape").value;
+      const shape = shapes[shapeKey];
+      const container = document.getElementById("shapeInputs");
+      container.innerHTML = "";
+      for (const key in shape) {
+        if (key !== "type") {
+          const input = document.createElement("input");
+          input.type = "number";
+          input.id = key;
+          input.placeholder = `${key} (${shape[key]})`;
+          input.value = shape[key];
+          container.appendChild(input);
+        }
+      }
+    }
+
+    function generateGCode() {
+      const tool = tools[document.getElementById("toolSelect").value];
+      const depths = document.getElementById("passDepths").value.split(",").map(d => parseFloat(d));
+      let gcode = `; Generated by Valtzakis CNC Generator\n`;
+      gcode += `G0 Z${tool.safeZ}\n`;
+
+      // Example: just simulate a rectangle cut
+      const width = parseFloat(document.getElementById("width")?.value || 100);
+      const height = parseFloat(document.getElementById("height")?.value || 50);
+      const x = parseFloat(document.getElementById("centerX").value || 0);
+      const y = parseFloat(document.getElementById("centerY").value || 0);
+
+      depths.forEach(depth => {
+        gcode += `G1 Z${depth} F${tool.plungeRate}\n`;
+        gcode += `G1 X${x - width / 2} Y${y - height / 2} F${tool.feedRate}\n`;
+        gcode += `G1 X${x + width / 2} Y${y - height / 2}\n`;
+        gcode += `G1 X${x + width / 2} Y${y + height / 2}\n`;
+        gcode += `G1 X${x - width / 2} Y${y + height / 2}\n`;
+        gcode += `G1 X${x - width / 2} Y${y - height / 2}\n`;
+        gcode += `G0 Z${tool.safeZ}\n`;
+      });
+
+      gcode += document.getElementById("ppEditor").value + "\n";
+      document.getElementById("gcodeOutput").value = gcode;
+    }
+
+    function downloadGCode() {
+      const blob = new Blob([document.getElementById("gcodeOutput").value], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "valtzakis.nc";
+      link.click();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+body {
+  font-family: sans-serif;
+  padding: 20px;
+  max-width: 800px;
+  margin: auto;
+}
+input, select, button, textarea {
+  width: 100%;
+  margin: 10px 0;
+  padding: 8px;
+}
+canvas {
+  border: 1px solid #000;
+  margin-top: 10px;
+}
+.active {
+  background: #0077cc;
+  color: white;
+}

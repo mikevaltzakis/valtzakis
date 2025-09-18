@@ -1,0 +1,17 @@
+{
+  "adaptiveClearing": {
+    "enabled": true,
+    "minStepOver": 0.2,
+    "maxStepOver": 0.6,
+    "strategy": "trochoidal"
+  },
+  "restMachining": {
+    "enabled": true,
+    "threshold": 0.3,
+    "toolChange": true
+  },
+  "animatedPreview": {
+    "enabled": true,
+    "speed": 1.0
+  }
+}
